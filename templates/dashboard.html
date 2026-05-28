@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+    <title>Dashboard de Monitoreo</title>
+
+    <!-- Auto Refresh -->
+    <meta http-equiv="refresh" content="10">
+
+    <!-- ChartJS -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+
+        body{
+            font-family: Arial, sans-serif;
+            margin:40px;
+            background:#f4f4f4;
+        }
+
+        h1{
+            color:#333;
+        }
+
+        h2{
+            margin-top:40px;
+            color:#2c3e50;
+        }
+
+        .card{
+            display:inline-block;
+            width:250px;
+            padding:20px;
+            margin:10px;
+            background:white;
+            border-radius:10px;
+            box-shadow:0px 0px 5px gray;
+            text-align:center;
+        }
+
+        .valor{
+            font-size:30px;
+            font-weight:bold;
+            color:#2c3e50;
+        }
+
+        table{
+            width:100%;
+            border-collapse:collapse;
+            background:white;
+            margin-top:20px;
+        }
+
+        th{
+            background:#2c3e50;
+            color:white;
+        }
+
+        th,td{
+            padding:10px;
+            border:1px solid #ddd;
+            text-align:center;
+        }
+
+        .alerta{
+            color:red;
+            font-weight:bold;
+            background:#ffe6e6;
+            padding:10px;
+            border-radius:8px;
+        }
+
+        .ok{
+            color:green;
+            font-weight:bold;
+            background:#e6ffe6;
+            padding:10px;
+            border-radius:8px;
+        }
+
+        canvas{
+            background:white;
+            padding:20px;
+            border-radius:10px;
+            margin-top:20px;
+            box-shadow:0px 0px 5px gray;
+        }
+
+        .graficos{
+            display:flex;
+            gap:20px;
+            justify-content:space-between;
+            align-items:center;
+            flex-wrap:wrap;
+            margin-top:20px;
+        }
+
+        .grafico-card{
+            background:white;
+            padding:15px;
+            border-radius:10px;
+            box-shadow:0px 0px 5px gray;
+            width:30%;
+            min-width:300px;
+        }
+
+        .grafico-card canvas{
+            width:100% !important;
+            height:250px !important;
+        }
+
+    </style>
+
+</head>
+
+<body>
+
+<h1>Sistema de Monitoreo de Infraestructura</h1>
+
+<h3>Servicios Docker Monitoreados por SNMP</h3>
+
+<!-- TARJETAS -->
+
+<div class="card">
+    <h3>RAM Promedio</h3>
+    <div class="valor">{{ promedio_ram }}%</div>
+</div>
+
+<div class="card">
+    <h3>CPU Promedio</h3>
+    <div class="valor">{{ promedio_disco }}%</div>
+</div>
+
+<div class="card">
+    <h3>Ancho Banda</h3>
+    <div class="valor">{{ promedio_red }}</div>
+</div>
+
+<br><br>
+
+<!-- ALERTAS -->
+
+<h2>Alertas Automáticas</h2>
+
+{% if promedio_ram > 80 %}
+<p class="alerta">
+⚠ Uso de RAM elevado
+</p>
+{% else %}
+<p class="ok">
+✔ RAM dentro de parámetros normales
+</p>
+{% endif %}
+
+{% if promedio_disco > 80 %}
+<p class="alerta">
+⚠ Uso de CPU elevado
+</p>
+{% else %}
+<p class="ok">
+✔ CPU dentro de parámetros normales
+</p>
+{% endif %}
+
+{% if promedio_red > 1000000 %}
+<p class="alerta">
+⚠ Tráfico de red elevado
+</p>
+{% else %}
+<p class="ok">
+✔ Tráfico de red estable
+</p>
+{% endif %}
+
+<!-- GRAFICOS -->
+
+<h2>Gráficos en Tiempo Real</h2>
+
+<div class="graficos">
+
+    <div class="grafico-card">
+        <canvas id="graficoRAM"></canvas>
+    </div>
+
+    <div class="grafico-card">
+        <canvas id="graficoCPU"></canvas>
+    </div>
+
+    <div class="grafico-card">
+        <canvas id="graficoRED"></canvas>
+    </div>
+
+</div>
+
+<!-- TABLA -->
+
+<h2>Histórico de Métricas</h2>
+
+<table>
+
+<tr>
+    <th>ID</th>
+    <th>Servicio</th>
+    <th>RAM (%)</th>
+    <th>CPU (%)</th>
+    <th>Ancho Banda</th>
+    <th>Fecha</th>
+</tr>
+
+{% for fila in metricas %}
+
+<tr>
+    <td>{{ loop.index }}</td>
+    <td>{{ fila[0] }}</td>
+    <td>{{ fila[1] }}</td>
+    <td>{{ fila[2] }}</td>
+    <td>{{ fila[3] }}</td>
+    <td>{{ fila[4] }}</td>
+</tr>
+
+{% endfor %}
+
+</table>
+
+<!-- CHART JS -->
+
+<script>
+
+const labels = [
+    {% for fila in metricas %}
+        "{{ fila[4] }}",
+    {% endfor %}
+]
+
+const ramData = [
+    {% for fila in metricas %}
+        {{ fila[1] }},
+    {% endfor %}
+]
+
+const cpuData = [
+    {% for fila in metricas %}
+        {{ fila[2] }},
+    {% endfor %}
+]
+
+const redData = [
+    {% for fila in metricas %}
+        {{ fila[3] }},
+    {% endfor %}
+]
+
+/* RAM */
+
+new Chart(document.getElementById('graficoRAM'), {
+
+    type: 'line',
+
+    data: {
+
+        labels: labels,
+
+        datasets: [{
+
+            label: 'RAM %',
+
+            data: ramData,
+
+            borderWidth: 2,
+            tension: 0.3
+
+        }]
+    }
+
+})
+
+/* CPU */
+
+new Chart(document.getElementById('graficoCPU'), {
+
+    type: 'line',
+
+    data: {
+
+        labels: labels,
+
+        datasets: [{
+
+            label: 'CPU %',
+
+            data: cpuData,
+
+            borderWidth: 2,
+            tension: 0.3
+
+        }]
+    }
+
+})
+
+/* RED */
+
+new Chart(document.getElementById('graficoRED'), {
+
+    type: 'line',
+
+    data: {
+
+        labels: labels,
+
+        datasets: [{
+
+            label: 'Tráfico Red',
+
+            data: redData,
+
+            borderWidth: 2,
+            tension: 0.3
+
+        }]
+    }
+
+})
+
+</script>
+
+</body>
+</html>
