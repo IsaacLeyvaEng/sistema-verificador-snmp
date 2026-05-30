@@ -79,6 +79,37 @@
             border-radius:8px;
         }
 
+        /* ESTILOS PARA EL STATUS DE BD */
+        .db-status-banner {
+            padding: 15px 25px;
+            border-radius: 12px;
+            margin-bottom: 25px;
+            display: inline-block;
+            font-size: 1.1em;
+            border: 2px solid;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .db-ok {
+            background-color: #d4edda;
+            color: #155724;
+            border-color: #c3e6cb;
+        }
+
+        .db-failover {
+            background-color: #f8d7da;
+            color: #721c24;
+            border-color: #f5c6cb;
+            animation: parpadeo 1.5s infinite;
+            font-weight: bold;
+        }
+
+        @keyframes parpadeo {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(1.02); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
         canvas{
             background:white;
             padding:20px;
@@ -117,6 +148,23 @@
 <body>
 
 <h1>Sistema de Monitoreo de Infraestructura</h1>
+
+<div style="margin-top: 10px;">
+    {% if 'ESCLAVO' in db_status %}
+        <div class="db-status-banner db-failover">
+            <span style="font-size: 1.4em;">⚠</span> 
+            <strong>MODO DE EMERGENCIA ACTIVO:</strong> 
+            Se ha perdido conexión con la base de datos principal. 
+            Operando con respaldo en: <u>{{ db_status }}</u>
+        </div>
+    {% else %}
+        <div class="db-status-banner db-ok">
+            <span style="font-size: 1.2em;">✔</span> 
+            <strong>ESTADO OPERACIONAL:</strong> 
+            Conexión estable con <u>{{ db_status }}</u>
+        </div>
+    {% endif %}
+</div>
 
 <h3>Servicios Docker Monitoreados por SNMP</h3>
 

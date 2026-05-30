@@ -5,36 +5,69 @@ from datetime import datetime
 import re
 
 # ==========================================
-# CONEXION MYSQL
+# CONFIGURACION MYSQL CON FAILOVER
 # ==========================================
 
-DB_HOST = "localhost"
+DB_HOST_MASTER = "localhost"
+DB_HOST_SLAVE = "localhost"
 DB_USER = "admin"
 DB_PASSWORD = "admin"
 DB_NAME = "monitoreo"
-DB_PORT = 3306
+DB_PORT_MASTER = 3306
+DB_PORT_SLAVE = 3307
 
-# CONEXION MYSQL
+def obtener_conexion():
+    """Intenta conectar al Maestro, si falla, conecta al Esclavo y asegura que la tabla exista."""
+    configuraciones = [
+        (DB_HOST_MASTER, DB_PORT_MASTER, "MAESTRO (Local)"),
+        (DB_HOST_SLAVE, DB_PORT_SLAVE, "ESCLAVO (Docker Failover)")
+    ]
 
-conexion = pymysql.connect(
-    host=DB_HOST,
-    user=DB_USER,
-    password=DB_PASSWORD,
-    database=DB_NAME,
-    port=DB_PORT
-)
-
-cursor = conexion.cursor()
+    for host, port, nombre in configuraciones:
+        try:
+            conn = pymysql.connect(
+                host=host,
+                user=DB_USER,
+                password=DB_PASSWORD,
+                database=DB_NAME,
+                port=port,
+                connect_timeout=3
+            )
+            
+            # ASEGURAR QUE LA TABLA EXISTE EN ESTE NODO
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS registro_metricas (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        servicio_origen VARCHAR(100),
+                        consumo_ram VARCHAR(100),
+                        consumo_cpu VARCHAR(100),
+                        ancho_banda VARCHAR(100),
+                        fecha_registro VARCHAR(100)
+                    )
+                """)
+                conn.commit()
+            
+            return conn
+        except Exception as e:
+            print(f"DEBUG: No se pudo conectar o inicializar {nombre} ({port}): {e}")
+            continue
+    
+    print("ERROR CRÍTICO: Ambas bases de datos están caídas o inaccesibles.")
+    return None
 
 # ==========================================
 # LIMPIAR TABLA AL INICIAR
 # ==========================================
 
-cursor.execute("DELETE FROM registro_metricas")
-conexion.commit()
-
-cursor.execute("ALTER TABLE registro_metricas AUTO_INCREMENT = 1")
-conexion.commit()
+conexion = obtener_conexion()
+if conexion:
+    cursor = conexion.cursor()
+    cursor.execute("DELETE FROM registro_metricas")
+    conexion.commit()
+    cursor.execute("ALTER TABLE registro_metricas AUTO_INCREMENT = 1")
+    conexion.commit()
+    conexion.close()
 
 
 # ==========================================
@@ -116,46 +149,42 @@ while True:
         #print("RED:", ancho_banda)
 
         # ==========================================
-        # GUARDAR MYSQL
+        # GUARDAR MYSQL CON FAILOVER
         # ==========================================
 
-        conexion = pymysql.connect(
-            host=DB_HOST,
-            user=DB_USER,
-            password=DB_PASSWORD,
-            database=DB_NAME,
-            port=DB_PORT
-        )
+        conexion = obtener_conexion()
 
-        cursor = conexion.cursor()
+        if conexion:
+            cursor = conexion.cursor()
 
-        sql = """
-        INSERT INTO registro_metricas
-        (
-            servicio_origen,
-            consumo_ram,
-            consumo_cpu,
-            ancho_banda,
-            fecha_registro
-        )
-        VALUES (%s,%s,%s,%s,%s)
-        """
+            sql = """
+            INSERT INTO registro_metricas
+            (
+                servicio_origen,
+                consumo_ram,
+                consumo_cpu,
+                ancho_banda,
+                fecha_registro
+            )
+            VALUES (%s,%s,%s,%s,%s)
+            """
 
-        valores = (
-            servicio_origen,
-            uso_ram,
-            uso_cpu,
-            ancho_banda,
-            datetime.now()
-        )
+            valores = (
+                servicio_origen,
+                uso_ram,
+                uso_cpu,
+                ancho_banda,
+                str(datetime.now())
+            )
 
-        cursor.execute(sql, valores)
+            cursor.execute(sql, valores)
+            conexion.commit()
+            conexion.close()
 
-        conexion.commit()
+            print(f"Datos guardados correctamente - {datetime.now().strftime('%H:%M:%S')}")
+        else:
+            print("No se pudo guardar: Ambas bases de datos están fuera de servicio.")
 
-        conexion.close()
-
-        print(f"Datos guardados correctamente - {datetime.now().strftime('%H:%M:%S')}")
         print("--------------------------------")
 
     except Exception as e:
