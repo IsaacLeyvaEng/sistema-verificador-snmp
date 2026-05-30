@@ -43,7 +43,7 @@ conexion.commit()
 
 def obtener_oid(oid):
 
-    comando = f"snmpget -v2c -c public 192.168.0.101 {oid}"
+    comando = f"snmpget -v2c -c public 192.168.1.10 {oid}"
     #comando = f"snmpget -v2c -c public localhost {oid}"
 
     salida = getoutput(comando)
@@ -58,7 +58,7 @@ def obtener_oid(oid):
 # OBTENER NOMBRE DE SISTEMA
 def obtener_oid_texto(oid, valor_por_defecto="SNMP-LINUX"):
 
-    comando = f"snmpget -v2c -c public 192.168.0.101 {oid}"
+    comando = f"snmpget -v2c -c public 192.168.1.10 {oid}"
     salida = getoutput(comando)
 
     try:
