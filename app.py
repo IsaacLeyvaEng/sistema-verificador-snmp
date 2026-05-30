@@ -135,84 +135,71 @@ def login():
 
 @app.route("/dashboard")
 def dashboard():
+    # 1. Intentar conectar a ambas
+    conn_m, status_m = conectar_especifica(DB_HOST_MASTER, DB_PORT_MASTER, "MAESTRO")
+    conn_s, status_s = conectar_especifica(DB_HOST_SLAVE, DB_PORT_SLAVE, "ESCLAVO")
 
-    conexion, host_activo = obtener_conexion()
-    if not conexion:
-        return "Error: No se pudo conectar a ninguna base de datos.", 500
+    all_metricas = []
+    
+    # 2. Extraer datos de las que estén disponibles
+    if conn_m:
+        with conn_m.cursor() as cur:
+            cur.execute("SELECT servicio_origen, consumo_ram, consumo_cpu, ancho_banda, fecha_registro, base_datos FROM registro_metricas")
+            all_metricas.extend(cur.fetchall())
+        conn_m.close()
+    
+    if conn_s:
+        with conn_s.cursor() as cur:
+            cur.execute("SELECT servicio_origen, consumo_ram, consumo_cpu, ancho_banda, fecha_registro, base_datos FROM registro_metricas")
+            all_metricas.extend(cur.fetchall())
+        conn_s.close()
 
-    cursor = conexion.cursor()
+    # 3. Eliminar duplicados y ordenar
+    # Usamos un diccionario con la fecha como clave para quedarnos solo con una versión de cada registro
+    metricas_unicas = {}
+    for m in all_metricas:
+        fecha = m[4]
+        # Si ya existe, preferimos la que diga "MAESTRO" para que se vea más limpio, 
+        # a menos que sea un registro de FAILOVER
+        if fecha not in metricas_unicas or m[5] == "ESCLAVO (FAILOVER)":
+            metricas_unicas[fecha] = m
 
-    # Últimos registros
-    cursor.execute("""
-        SELECT
-            servicio_origen,
-            consumo_ram,
-            consumo_cpu,
-            ancho_banda,
-            fecha_registro,
-            base_datos
-        FROM registro_metricas
-        ORDER BY fecha_registro DESC
-        LIMIT 20
-    """)
+    # Convertir a lista y ordenar por fecha descendente
+    metricas_finales = sorted(metricas_unicas.values(), key=lambda x: x[4], reverse=True)[:30]
 
-    metricas = cursor.fetchall()
+    # 4. Calcular promedios sobre la lista unificada
+    if metricas_finales:
+        promedio_ram = sum(float(m[1]) for m in metricas_finales) / len(metricas_finales)
+        promedio_cpu = sum(float(m[2]) for m in metricas_finales) / len(metricas_finales)
+        promedio_red = sum(float(m[3]) for m in metricas_finales) / len(metricas_finales)
+        max_ram = max(float(m[1]) for m in metricas_finales)
+        max_cpu = max(float(m[2]) for m in metricas_finales)
+        max_red = max(float(m[3]) for m in metricas_finales)
+    else:
+        promedio_ram = promedio_cpu = promedio_red = max_ram = max_cpu = max_red = 0
 
-    # Promedio RAM
-    cursor.execute("""
-        SELECT AVG(CAST(consumo_ram AS DECIMAL(10,2)))
-        FROM registro_metricas
-    """)
-    promedio_ram = cursor.fetchone()[0] or 0
-
-    # Promedio CPU
-    cursor.execute("""
-        SELECT AVG(CAST(consumo_cpu AS DECIMAL(10,2)))
-        FROM registro_metricas
-    """)
-    promedio_disco = cursor.fetchone()[0] or 0
-
-    # Promedio Red
-    cursor.execute("""
-        SELECT AVG(CAST(ancho_banda AS DECIMAL(10,2)))
-        FROM registro_metricas
-    """)
-    promedio_red = cursor.fetchone()[0] or 0
-
-    # Máximo RAM
-    cursor.execute("""
-        SELECT MAX(CAST(consumo_ram AS DECIMAL(10,2)))
-        FROM registro_metricas
-    """)
-    max_ram = cursor.fetchone()[0] or 0
-
-    # Máximo CPU
-    cursor.execute("""
-        SELECT MAX(CAST(consumo_cpu AS DECIMAL(10,2)))
-        FROM registro_metricas
-    """)
-    max_disco = cursor.fetchone()[0] or 0
-
-    # Máximo Red
-    cursor.execute("""
-        SELECT MAX(CAST(ancho_banda AS DECIMAL(10,2)))
-        FROM registro_metricas
-    """)
-    max_red = cursor.fetchone()[0] or 0
-
-    conexion.close()
+    # Determinar host activo para el banner
+    host_para_banner = "MAESTRO (Local)" if status_m else "ESCLAVO (Docker Failover)"
 
     return render_template(
         "dashboard.html",
-        metricas=metricas,
-        promedio_ram=round(float(promedio_ram), 2),
-        promedio_disco=round(float(promedio_disco), 2),
-        promedio_red=round(float(promedio_red), 2),
-        max_ram=round(float(max_ram), 2),
-        max_disco=round(float(max_disco), 2),
-        max_red=round(float(max_red), 2),
-        db_status=host_activo
+        metricas=metricas_finales,
+        promedio_ram=round(promedio_ram, 2),
+        promedio_disco=round(promedio_cpu, 2),
+        promedio_red=round(promedio_red, 2),
+        max_ram=round(max_ram, 2),
+        max_disco=round(max_cpu, 2),
+        max_red=round(max_red, 2),
+        db_status=host_para_banner
     )
+
+def conectar_especifica(host, port, nombre):
+    try:
+        conn = pymysql.connect(host=host, port=port, user=DB_USER, password=DB_PASSWORD, database=DB_NAME, connect_timeout=2)
+        verificar_y_crear_tabla(conn)
+        return conn, nombre
+    except:
+        return None, None
 
 # ==========================================
 # INICIO
