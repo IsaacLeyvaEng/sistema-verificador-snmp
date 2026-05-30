@@ -2,14 +2,15 @@ from subprocess import getoutput
 import pymysql
 import time
 from datetime import datetime
+import re
 
 # ==========================================
 # CONEXION MYSQL
 # ==========================================
 
 DB_HOST = "localhost"
-DB_USER = "root"
-DB_PASSWORD = "root_password"
+DB_USER = "admin"
+DB_PASSWORD = "admin"
 DB_NAME = "monitoreo"
 DB_PORT = 3306
 
@@ -42,20 +43,45 @@ conexion.commit()
 
 def obtener_oid(oid):
 
-    comando = f"snmpget -v2c -c public localhost {oid}"
+    comando = f"snmpget -v2c -c public 192.168.0.101 {oid}"
+    #comando = f"snmpget -v2c -c public localhost {oid}"
 
     salida = getoutput(comando)
-
     try:
         valor = salida.split(":")[-1].strip()
-        return int(valor)
+        numero = re.search(r"-?\d+", valor)
+        return int(numero.group()) if numero else 0
 
     except:
         return 0
 
+# OBTENER NOMBRE DE SISTEMA
+def obtener_oid_texto(oid, valor_por_defecto="SNMP-LINUX"):
+
+    comando = f"snmpget -v2c -c public 192.168.0.101 {oid}"
+    salida = getoutput(comando)
+
+    try:
+        if "=" in salida:
+            parte_derecha = salida.split("=", 1)[1].strip()
+        else:
+            parte_derecha = salida.strip()
+
+        if ":" in parte_derecha:
+            texto = parte_derecha.split(":", 1)[1].strip()
+        else:
+            texto = parte_derecha
+
+        texto = texto.strip().strip('"')
+        return texto if texto else valor_por_defecto
+    except:
+        return valor_por_defecto
+
 # ==========================================
 # RECOLECTOR
 # ==========================================
+servicio_origen = obtener_oid_texto("1.3.6.1.2.1.1.5.0")
+
 while True:
 
     try:
@@ -70,8 +96,8 @@ while True:
         cpu_idle = obtener_oid("1.3.6.1.4.1.2021.11.11.0")
 
         # TRAFICO RED
-        red = obtener_oid("1.3.6.1.2.1.2.2.1.10.2")
-
+        #red = obtener_oid("1.3.6.1.2.1.2.2.1.10.2")
+        red = obtener_oid("1.3.6.1.2.1.2.2.1.10.3")
         # ==========================================
         # CALCULOS
         # ==========================================
@@ -85,9 +111,9 @@ while True:
 
         ancho_banda = round(red / 1000000, 2)
 
-        print("RAM:", uso_ram)
-        print("CPU:", uso_cpu)
-        print("RED:", ancho_banda)
+        #print("RAM:", uso_ram)
+        #print("CPU:", uso_cpu)
+        #print("RED:", ancho_banda)
 
         # ==========================================
         # GUARDAR MYSQL
@@ -108,7 +134,7 @@ while True:
         (
             servicio_origen,
             consumo_ram,
-            consumo_disco,
+            consumo_cpu,
             ancho_banda,
             fecha_registro
         )
@@ -116,7 +142,7 @@ while True:
         """
 
         valores = (
-            "SNMP-LINUX",
+            servicio_origen,
             uso_ram,
             uso_cpu,
             ancho_banda,
@@ -129,10 +155,11 @@ while True:
 
         conexion.close()
 
-        print("Datos guardados correctamente")
+        print(f"Datos guardados correctamente - {datetime.now().strftime('%H:%M:%S')}")
         print("--------------------------------")
 
     except Exception as e:
         print("Error:", e)
 
     time.sleep(10)
+    #time.sleep(10)

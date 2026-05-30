@@ -8,8 +8,8 @@ app = Flask(__name__)
 # ==========================================
 
 DB_HOST = "localhost"
-DB_USER = "root"
-DB_PASSWORD = "root_password"
+DB_USER = "admin"
+DB_PASSWORD = "admin"
 DB_NAME = "monitoreo"
 DB_PORT = 3306
 
@@ -84,7 +84,7 @@ def dashboard():
         SELECT
             servicio_origen,
             consumo_ram,
-            consumo_disco,
+            consumo_cpu,
             ancho_banda,
             fecha_registro
         FROM registro_metricas
@@ -103,7 +103,7 @@ def dashboard():
 
     # Promedio Disco
     cursor.execute("""
-        SELECT AVG(consumo_disco)
+        SELECT AVG(consumo_cpu)
         FROM registro_metricas
     """)
     promedio_disco = cursor.fetchone()[0] or 0
@@ -124,7 +124,7 @@ def dashboard():
 
     # Máximo Disco
     cursor.execute("""
-        SELECT MAX(consumo_disco)
+        SELECT MAX(consumo_cpu)
         FROM registro_metricas
     """)
     max_disco = cursor.fetchone()[0] or 0
