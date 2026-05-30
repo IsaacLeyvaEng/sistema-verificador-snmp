@@ -254,6 +254,7 @@
     <th>CPU (%)</th>
     <th>Ancho Banda</th>
     <th>Fecha</th>
+    <th>Base de Datos</th>
 </tr>
 
 {% for fila in metricas %}
@@ -265,6 +266,17 @@
     <td>{{ fila[2] }}</td>
     <td>{{ fila[3] }}</td>
     <td>{{ fila[4] }}</td>
+    <td style="padding: 5px;">
+        {% if fila[5] == 'MAESTRO' %}
+            <span style="background: #e6ffe6; color: green; border: 1px solid green; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85em;">
+                {{ fila[5] }}
+            </span>
+        {% else %}
+            <span style="background: #fff3cd; color: #856404; border: 1px solid #ffeeba; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85em;">
+                {{ fila[5] }}
+            </span>
+        {% endif %}
+    </td>
 </tr>
 
 {% endfor %}

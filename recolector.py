@@ -19,8 +19,8 @@ DB_PORT_SLAVE = 3307
 def obtener_conexion():
     """Intenta conectar al Maestro, si falla, conecta al Esclavo y asegura que la tabla exista."""
     configuraciones = [
-        (DB_HOST_MASTER, DB_PORT_MASTER, "MAESTRO (Local)"),
-        (DB_HOST_SLAVE, DB_PORT_SLAVE, "ESCLAVO (Docker Failover)")
+        (DB_HOST_MASTER, DB_PORT_MASTER, "MAESTRO"),
+        (DB_HOST_SLAVE, DB_PORT_SLAVE, "ESCLAVO")
     ]
 
     for host, port, nombre in configuraciones:
@@ -43,24 +43,25 @@ def obtener_conexion():
                         consumo_ram VARCHAR(100),
                         consumo_cpu VARCHAR(100),
                         ancho_banda VARCHAR(100),
-                        fecha_registro VARCHAR(100)
+                        fecha_registro VARCHAR(100),
+                        base_datos VARCHAR(50)
                     )
                 """)
                 conn.commit()
             
-            return conn
+            return conn, nombre
         except Exception as e:
             print(f"DEBUG: No se pudo conectar o inicializar {nombre} ({port}): {e}")
             continue
     
     print("ERROR CRÍTICO: Ambas bases de datos están caídas o inaccesibles.")
-    return None
+    return None, None
 
 # ==========================================
 # LIMPIAR TABLA AL INICIAR
 # ==========================================
 
-conexion = obtener_conexion()
+conexion, db_actual = obtener_conexion()
 if conexion:
     cursor = conexion.cursor()
     cursor.execute("DELETE FROM registro_metricas")
@@ -152,7 +153,7 @@ while True:
         # GUARDAR MYSQL CON FAILOVER
         # ==========================================
 
-        conexion = obtener_conexion()
+        conexion, db_actual = obtener_conexion()
 
         if conexion:
             cursor = conexion.cursor()
@@ -164,9 +165,10 @@ while True:
                 consumo_ram,
                 consumo_cpu,
                 ancho_banda,
-                fecha_registro
+                fecha_registro,
+                base_datos
             )
-            VALUES (%s,%s,%s,%s,%s)
+            VALUES (%s,%s,%s,%s,%s,%s)
             """
 
             valores = (
@@ -174,7 +176,8 @@ while True:
                 uso_ram,
                 uso_cpu,
                 ancho_banda,
-                str(datetime.now())
+                str(datetime.now()),
+                db_actual
             )
 
             cursor.execute(sql, valores)

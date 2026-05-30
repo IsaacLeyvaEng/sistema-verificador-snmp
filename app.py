@@ -63,7 +63,8 @@ def verificar_y_crear_tabla(conexion):
                     consumo_ram VARCHAR(100),
                     consumo_cpu VARCHAR(100),
                     ancho_banda VARCHAR(100),
-                    fecha_registro VARCHAR(100)
+                    fecha_registro VARCHAR(100),
+                    base_datos VARCHAR(50)
                 )
             """)
             # También necesitamos la tabla usuarios para el login
@@ -148,7 +149,8 @@ def dashboard():
             consumo_ram,
             consumo_cpu,
             ancho_banda,
-            fecha_registro
+            fecha_registro,
+            base_datos
         FROM registro_metricas
         ORDER BY fecha_registro DESC
         LIMIT 20
